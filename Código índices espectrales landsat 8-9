@@ -1,0 +1,258 @@
+//Código índices espectrales 
+
+var geometry = ee.Geometry.Polygon(
+        [[[-102.75169458389844, 22.859475866327184],
+          [-102.75169458389844, 22.806159041529302],
+          [-102.66740884781446, 22.806159041529302],
+          [-102.66740884781446, 22.859475866327184]]], null, false);
+
+//Landsat8
+var landsat_8 = ee.ImageCollection("LANDSAT/LC08/C02/T1_L2")
+.filterDate("2013-01-01", "2013-12-01") //Filtro por fecha 
+.filterMetadata("CLOUD_COVER", "Less_than", 10) //Filtro nubosidad
+.filterBounds(geometry) //Filtro por geometría 
+
+//Landsat9
+var landsat_9 = ee.ImageCollection("LANDSAT/LC09/C02/T1_L2")
+.filterDate("2022-01-01", "2022-12-01")
+.filterMetadata("CLOUD_COVER", "Less_than", 10)
+.filterBounds(geometry)
+
+print(landsat_8);
+
+print(landsat_9);
+
+//selecionar imagen
+var img_L8= landsat_8.sort("CLOUD_COVER").first()
+print(img_L8)
+
+var img_L9= landsat_9.sort("CLOUD_COVER").first()
+print(img_L9)
+
+
+//cortar la imagen
+
+var img_L8_C = img_L8.clip(geometry);
+
+print(img_L8_C)
+
+var img_L9_C = img_L9.clip(geometry);
+
+print(img_L9_C)
+
+
+//Visualizar imagen
+
+Map.addLayer(img_L8_C,{
+  min:150,
+  max:1200,
+  gamma:0.5,
+  bands:["SR_B6", "SR_B5", "SR_B4"]
+}, "Analisis de cobertura");
+
+
+Map.addLayer(img_L9_C,{
+  min:150,
+  max:1200,
+  gamma:0.5,
+  bands:["SR_B6", "SR_B5", "SR_B4"]
+}, "Analisis de cobertura9");
+
+
+//Parametro de visualización
+
+var viss={
+  min:-0.2,
+  max:0.8,
+  pallete:["red", "yellow", "green"]
+};
+
+//Cálculo NDVI 
+//ANÁLISIS DE VEGETACIÓN - Estado fotosintetico
+
+var NDVI= img_L8_C.expression("(NIR-RED)/(NIR+RED)", {
+  "NIR": img_L8_C.select("SR_B5"),
+  "RED": img_L8_C.select("SR_B4")
+});
+
+
+var NDVI9= img_L9_C.expression("(NIR-RED)/(NIR+RED)", {
+  "NIR": img_L9_C.select("SR_B5"),
+  "RED": img_L9_C.select("SR_B4")
+});
+
+
+//Cálculo SAVI (ANALISIS DE VEGETACIÓN AJUSTADO A SUELO - ZONAS ÁRIDAS
+
+var SAVI= img_L8_C.expression("float(((NIR-RED)/(NIR+RED+L))*(1+L))", {
+  "L": 0.5, //termino medio 0-1
+  "NIR": img_L8_C.select("SR_B5"),
+  "RED": img_L8_C.select("SR_B4")
+})
+
+
+var SAVI9= img_L9_C.expression("float(((NIR-RED)/(NIR+RED+L))*(1+L))", {
+  "L": 0.5, //termino medio 0-1
+  "NIR": img_L9_C.select("SR_B5"),
+  "RED": img_L9_C.select("SR_B4")
+})
+
+
+//Cálculo de BSI (Índice de suelo)
+
+var BSI= img_L8_C.expression("((SWIR+RED)-(NIR+BLUE))/((SWIR+RED)+(NIR+BLUE))", {
+  "SWIR":  img_L8_C.select("SR_B6"),
+  "RED": img_L8_C.select("SR_B4"),
+  "NIR": img_L8_C.select("SR_B5"),
+  "BLUE": img_L8_C.select("SR_B2")
+});
+
+var BSI9= img_L9_C.expression("((SWIR+RED)-(NIR+BLUE))/((SWIR+RED)+(NIR+BLUE))", {
+  "SWIR":  img_L9_C.select("SR_B6"),
+  "RED": img_L9_C.select("SR_B4"),
+  "NIR": img_L9_C.select("SR_B5"),
+  "BLUE": img_L9_C.select("SR_B2")
+});
+
+
+//Cálculo de NDMI (Contenido de agua en la vegetación)
+
+var NDMI= img_L8_C.expression("(NIR-SWIR)/(NIR+SWIR)", {
+  "NIR": img_L8_C.select("SR_B5"),
+  "SWIR": img_L8_C.select("SR_B6")
+});
+
+
+var NDMI9= img_L9_C.expression("(NIR-SWIR)/(NIR+SWIR)", {
+  "NIR": img_L9_C.select("SR_B5"),
+  "SWIR": img_L9_C.select("SR_B6")
+});
+
+
+//Análisis del terreno 
+
+//Añadir índices 
+
+Map.addLayer(NDVI, viss, "Índice NDVI")
+Map.addLayer(SAVI, viss, "Índice SAVI")
+Map.addLayer(BSI, viss, "Índice BSI")
+Map.addLayer(NDMI, viss, "Índice NDMI")
+
+
+Map.addLayer(NDVI9, viss, "Índice NDVI9")
+Map.addLayer(SAVI9, viss, "Índice SAVI9")
+Map.addLayer(BSI9, viss, "índice BSI9")
+Map.addLayer(NDMI9, viss, "Índice NDMI9")
+
+
+
+//Exportar imagenes
+
+Export.image.toDrive({
+image:img_L8.select(["SR_B6", "SR_B5", "SR_B4"]),
+description: "NATURALCOMP2013",
+folder: "EjemploGEE",
+fileNamePrefix: "NATURALCOMP2013",
+scale:30,
+region:geometry
+});
+
+
+Export.image.toDrive({
+image:NDVI,
+description: "NDVI2013",
+folder: "EjemploGEE",
+fileNamePrefix: "NDVI2013",
+scale:30,
+region:geometry
+});
+
+
+Export.image.toDrive({
+image:NDMI,
+description: "NDMI2013",
+folder: "EjemploGEE",
+fileNamePrefix: "NDMI2013",
+scale:30,
+region:geometry
+});
+
+
+Export.image.toDrive({
+image:SAVI,
+description: "SAVI2013",
+folder: "EjemploGEE",
+fileNamePrefix: "SAVI2013",
+scale:30,
+region:geometry
+});
+
+
+Export.image.toDrive({
+image:BSI,
+description: "BSI2013",
+folder: "EjemploGEE",
+fileNamePrefix: "BSI2013",
+scale:30,
+region:geometry
+});
+
+
+Export.image.toDrive({
+image:img_L9.select(["SR_B6", "SR_B5", "SR_B4"]),
+description: "NATURALCOMP2022",
+folder: "EjemploGEE",
+fileNamePrefix: "NATURALCOMP2022",
+scale:30,
+region:geometry
+});
+
+
+Export.image.toDrive({
+image:NDVI9,
+description: "NDVI2022",
+folder: "EjemploGEE",
+fileNamePrefix: "NDVI2022",
+scale:30,
+region:geometry
+});
+
+
+Export.image.toDrive({
+image:ndvi9,
+description: "ndvi2022",
+folder: "EjemploGEE",
+fileNamePrefix: "ndvi2022",
+scale:30,
+region:geometry
+});
+
+
+Export.image.toDrive({
+image:NDMI9,
+description: "NDMI2022",
+folder: "EjemploGEE",
+fileNamePrefix: "NDMI2022",
+scale:30,
+region:geometry
+});
+
+
+Export.image.toDrive({
+image:SAVI9,
+description: "SAVI2022",
+folder: "EjemploGEE",
+fileNamePrefix: "SAVI2022",
+scale:30,
+region:geometry
+});
+
+
+Export.image.toDrive({
+image:BSI9,
+description: "BSI2022",
+folder: "EjemploGEE",
+fileNamePrefix: "BSI2022",
+scale:30,
+region:geometry
+});
